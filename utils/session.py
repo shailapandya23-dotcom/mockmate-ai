@@ -11,7 +11,6 @@ def init_session_state():
         "domain": "DSA",
         "difficulty": "Medium",
         "total_questions": 5,
-        "api_key": "",
         "summary": None,
         "candidate_name": "",
         "interview_started": False,

@@ -15,6 +15,15 @@ from utils.storage import (
 )
 from utils.pdf_generator import generate_pdf
 
+
+def get_api_key():
+    if "GEMINI_API_KEY" in st.secrets:
+        return st.secrets["GEMINI_API_KEY"]
+    key = os.environ.get("GEMINI_API_KEY")
+    if key:
+        return key
+    return None
+
 st.set_page_config(
     page_title="MockMate AI — Technical Interview Simulator",
     page_icon="\U0001f3af",
@@ -259,18 +268,6 @@ init_session_state()
 with st.sidebar:
     st.markdown('<div class="sidebar-logo">\U0001f3af MockMate <span>AI Interview Simulator</span></div>', unsafe_allow_html=True)
 
-    api_key = st.text_input(
-        "Gemini API Key",
-        type="password",
-        value=st.session_state.api_key,
-        placeholder="Enter your API key",
-        help="Your API key is used only for this session and is not stored.",
-    )
-    if api_key:
-        st.session_state.api_key = api_key
-
-    st.markdown("---")
-
     st.markdown("### Navigation")
     col1, col2 = st.columns(2)
     with col1:
@@ -312,11 +309,13 @@ def show_setup_page():
         unsafe_allow_html=True,
     )
 
-    if not st.session_state.api_key:
-        st.warning(
-            "\U000026a0 Please enter your Gemini API key in the sidebar to get started.",
+    if not get_api_key():
+        st.error(
+            "\U000026a0 Gemini API key not configured. The app admin must set "
+            "`GEMINI_API_KEY` in Streamlit secrets or as an environment variable.",
             icon="\U0001f512",
         )
+        return
 
     st.markdown("### \U00002699\ufe0f Configure Your Interview")
 
@@ -367,7 +366,7 @@ def show_setup_page():
 
     _, center, _ = st.columns([1, 2, 1])
     with center:
-        start_disabled = not st.session_state.api_key
+        start_disabled = not get_api_key()
         if st.button(
             "\U000025b6 Start Interview",
             use_container_width=True,
@@ -376,7 +375,7 @@ def show_setup_page():
         ):
             with st.spinner("Generating interview questions..."):
                 try:
-                    client = GeminiClient(st.session_state.api_key)
+                    client = GeminiClient(get_api_key())
                     memory_exclusions = get_memory_exclusions(domain)
                     questions = client.generate_questions(
                         domain, difficulty, q_count, memory_exclusions
@@ -400,11 +399,6 @@ def show_setup_page():
                     st.info(
                         "Make sure your API key is valid and has access to the Gemini API."
                     )
-
-    if not st.session_state.api_key:
-        st.info(
-            "\U0001f4dd Your API key stays in your browser session and is never stored on our servers."
-        )
 
 # -------------------------------------------------------------------
 # Page: Interview
@@ -451,7 +445,7 @@ def show_interview_page():
                 else:
                     with st.spinner("Evaluating your answer..."):
                         try:
-                            client = GeminiClient(st.session_state.api_key)
+                            client = GeminiClient(get_api_key())
                             eval_data = client.evaluate_answer(
                                 st.session_state.questions[q_idx], answer
                             )
@@ -542,7 +536,7 @@ def show_interview_page():
                 if st.button("\U0001f3af View Results", use_container_width=True, type="primary"):
                     with st.spinner("Generating your performance summary..."):
                         try:
-                            client = GeminiClient(st.session_state.api_key)
+                            client = GeminiClient(get_api_key())
                             summary = client.generate_summary(
                                 st.session_state.domain,
                                 st.session_state.difficulty,
