@@ -1,7 +1,9 @@
 import json
 import re
+import time
 
 from google import genai
+from google.genai import errors as genai_errors
 
 QUESTION_GEN_PROMPT = """You are a senior technical interviewer at a top tech company. Generate {count} {difficulty} difficulty interview questions for the domain of {domain}.
 
@@ -78,6 +80,23 @@ class GeminiClient:
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
         self.model = "gemini-2.0-flash"
+        self.max_retries = 3
+
+    def _call_with_retry(self, prompt):
+        for attempt in range(self.max_retries + 1):
+            try:
+                return self.client.models.generate_content(
+                    model=self.model, contents=prompt
+                )
+            except genai_errors.ClientError as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    if attempt < self.max_retries:
+                        delay = (2 ** attempt) * 5
+                        time.sleep(delay)
+                        continue
+                raise
+            except Exception:
+                raise
 
     def _extract_json(self, text):
         json_match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
@@ -96,9 +115,7 @@ class GeminiClient:
             domain=domain,
             memory_exclusions=memory_exclusions,
         )
-        response = self.client.models.generate_content(
-            model=self.model, contents=prompt
-        )
+        response = self._call_with_retry(prompt)
         try:
             questions = self._extract_json(response.text)
         except Exception:
@@ -115,9 +132,7 @@ class GeminiClient:
 
     def evaluate_answer(self, question, answer):
         prompt = EVALUATION_PROMPT.format(question=question, answer=answer)
-        response = self.client.models.generate_content(
-            model=self.model, contents=prompt
-        )
+        response = self._call_with_retry(prompt)
         try:
             result = self._extract_json(response.text)
         except Exception:
@@ -154,9 +169,7 @@ class GeminiClient:
             count=count,
             evaluations_json=evaluations_json,
         )
-        response = self.client.models.generate_content(
-            model=self.model, contents=prompt
-        )
+        response = self._call_with_retry(prompt)
         try:
             result = self._extract_json(response.text)
         except Exception:
