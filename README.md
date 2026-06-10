@@ -21,7 +21,7 @@ An AI-powered technical interview simulator built with **Streamlit** and **Googl
 
 - **Python** — Core language
 - **Streamlit** — Web framework
-- **Google Gemini 2.0 Flash** — Question generation & answer evaluation
+- **Groq API** (default) or **Google Gemini** — Question generation & answer evaluation
 - **ReportLab** — PDF report generation
 - **JSON** — Local data storage
 
@@ -40,24 +40,28 @@ cd mockmate-ai
 pip install -r requirements.txt
 ```
 
-### 3. Get a Gemini API key
+### 3. Get a free API key
 
-Go to [Google AI Studio](https://aistudio.google.com/apikey), sign in, and click **Create API Key**.
+**Recommended: Groq** (free, no credit card, 30 req/min)
+
+Go to [console.groq.com](https://console.groq.com), sign up, and create an API key.
+
+**Alternative: Google Gemini** (free tier with limits)
+
+Go to [Google AI Studio](https://aistudio.google.com/apikey) and create an API key.
 
 ### 4. Configure your API key
-
-**Option A — Streamlit secrets (recommended for deployment):**
 
 Create `.streamlit/secrets.toml`:
 
 ```toml
-GEMINI_API_KEY = "your-api-key-here"
-```
+# For Groq (recommended):
+LLM_PROVIDER = "groq"
+GROQ_API_KEY = "gsk_your-groq-api-key"
 
-**Option B — Environment variable (local development):**
-
-```bash
-export GEMINI_API_KEY="your-api-key-here"
+# For Google Gemini:
+# LLM_PROVIDER = "gemini"
+# GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
 ### 5. Run the app
@@ -75,7 +79,8 @@ streamlit run app.py
 5. In **Settings → Secrets**, add:
 
    ```toml
-   GEMINI_API_KEY = "your-api-key-here"
+   LLM_PROVIDER = "groq"
+   GROQ_API_KEY = "gsk_your-groq-api-key"
    ```
 
 6. Click **Deploy**
@@ -94,7 +99,7 @@ mockmate-ai/
 │   └── history/
 │       └── history.json         # Interview history (auto-created)
     └── utils/
-        ├── gemini_client.py         # Gemini API wrapper + prompt templates
+        ├── llm_client.py            # Groq/Gemini API wrapper + prompt templates
         ├── pdf_generator.py         # PDF report generation
         ├── session.py               # Session state management
         └── storage.py               # JSON file I/O

@@ -4,7 +4,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from utils.gemini_client import GeminiClient
+from utils.llm_client import LLMClient
 from utils.session import init_session_state
 from utils.storage import (
     load_question_memory,
@@ -16,18 +16,34 @@ from utils.storage import (
 from utils.pdf_generator import generate_pdf
 
 
-def get_api_key():
-    if "GEMINI_API_KEY" in st.secrets:
-        return st.secrets["GEMINI_API_KEY"]
-    key = os.environ.get("GEMINI_API_KEY")
-    if key:
-        return key
-    return None
+def get_llm_config():
+    provider = (
+        st.secrets.get("LLM_PROVIDER")
+        or os.environ.get("LLM_PROVIDER")
+        or "gemini"
+    ).lower()
+
+    if provider == "groq":
+        api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
+        model = st.secrets.get("GROQ_MODEL") or os.environ.get("GROQ_MODEL")
+    else:
+        api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        model = st.secrets.get("GEMINI_MODEL") or os.environ.get("GEMINI_MODEL")
+
+    return provider, api_key, model
 
 
 def configure_from_secrets():
-    if "GEMINI_MODEL" in st.secrets:
-        os.environ["GEMINI_MODEL"] = st.secrets["GEMINI_MODEL"]
+    for key in ("LLM_PROVIDER", "GEMINI_API_KEY", "GEMINI_MODEL", "GROQ_API_KEY", "GROQ_MODEL"):
+        if key in st.secrets:
+            os.environ[key] = st.secrets[key]
+
+
+def get_llm_client():
+    provider, api_key, model = get_llm_config()
+    if not api_key:
+        return None
+    return LLMClient(api_key=api_key, provider=provider, model=model)
 
 st.set_page_config(
     page_title="MockMate AI — Technical Interview Simulator",
@@ -300,7 +316,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         "<p style='font-size:0.75rem;color:#999;text-align:center;'>"
-        "Powered by Gemini 2.0 Flash</p>",
+        "Powered by Groq / Gemini</p>",
         unsafe_allow_html=True,
     )
 
@@ -315,10 +331,11 @@ def show_setup_page():
         unsafe_allow_html=True,
     )
 
-    if not get_api_key():
+    provider, api_key, _ = get_llm_config()
+    if not api_key:
+        key_name = "GROQ_API_KEY" if provider == "groq" else "GEMINI_API_KEY"
         st.error(
-            "\U000026a0 Gemini API key not configured. The app admin must set "
-            "`GEMINI_API_KEY` in Streamlit secrets or as an environment variable.",
+            f"\U000026a0 API key not configured. Set `{key_name}` in Streamlit secrets.",
             icon="\U0001f512",
         )
         return
@@ -372,7 +389,7 @@ def show_setup_page():
 
     _, center, _ = st.columns([1, 2, 1])
     with center:
-        start_disabled = not get_api_key()
+        start_disabled = not api_key
         if st.button(
             "\U000025b6 Start Interview",
             use_container_width=True,
@@ -381,7 +398,10 @@ def show_setup_page():
         ):
             with st.spinner("Generating interview questions..."):
                 try:
-                    client = GeminiClient(get_api_key())
+                    client = get_llm_client()
+                    if not client:
+                        st.error("API key not configured.")
+                        st.stop()
                     memory_exclusions = get_memory_exclusions(domain)
                     questions = client.generate_questions(
                         domain, difficulty, q_count, memory_exclusions
@@ -451,7 +471,10 @@ def show_interview_page():
                 else:
                     with st.spinner("Evaluating your answer..."):
                         try:
-                            client = GeminiClient(get_api_key())
+                            client = get_llm_client()
+                            if not client:
+                                st.error("API key not configured.")
+                                st.stop()
                             eval_data = client.evaluate_answer(
                                 st.session_state.questions[q_idx], answer
                             )
@@ -542,7 +565,10 @@ def show_interview_page():
                 if st.button("\U0001f3af View Results", use_container_width=True, type="primary"):
                     with st.spinner("Generating your performance summary..."):
                         try:
-                            client = GeminiClient(get_api_key())
+                            client = get_llm_client()
+                            if not client:
+                                st.error("API key not configured.")
+                                st.stop()
                             summary = client.generate_summary(
                                 st.session_state.domain,
                                 st.session_state.difficulty,

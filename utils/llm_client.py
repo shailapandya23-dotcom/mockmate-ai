@@ -5,6 +5,7 @@ import time
 
 from google import genai
 from google.genai import errors as genai_errors
+from openai import OpenAI
 
 QUESTION_GEN_PROMPT = """You are a senior technical interviewer at a top tech company. Generate {count} {difficulty} difficulty interview questions for the domain of {domain}.
 
@@ -76,17 +77,46 @@ Return your summary as a valid JSON object with exactly this structure (no markd
 
 Derive the overall_score and skill_breakdown as averages/composites from the evaluations provided."""
 
+GROQ_MODELS = {
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+}
 
-class GeminiClient:
-    def __init__(self, api_key):
-        self.client = genai.Client(api_key=api_key)
-        self.model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODELS = {
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-pro",
+}
+
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+
+
+class LLMClient:
+    def __init__(self, api_key, provider=None, model=None):
+        self.provider = (provider or os.environ.get("LLM_PROVIDER", "gemini")).lower()
         self.max_retries = 3
 
-    def _call_with_retry(self, prompt):
+        if self.provider == "groq":
+            self.groq_client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.groq.com/openai/v1",
+            )
+            self.model = model or os.environ.get("GROQ_MODEL", DEFAULT_GROQ_MODEL)
+            if self.model not in GROQ_MODELS:
+                self.model = DEFAULT_GROQ_MODEL
+        else:
+            self.gemini_client = genai.Client(api_key=api_key)
+            self.model = model or os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
+            if self.model not in GEMINI_MODELS:
+                self.model = DEFAULT_GEMINI_MODEL
+
+    def _call_gemini(self, prompt):
         for attempt in range(self.max_retries + 1):
             try:
-                return self.client.models.generate_content(
+                return self.gemini_client.models.generate_content(
                     model=self.model, contents=prompt
                 )
             except genai_errors.ClientError as e:
@@ -98,12 +128,34 @@ class GeminiClient:
                 if "404" in str(e) or "NOT_FOUND" in str(e):
                     raise RuntimeError(
                         f'Model "{self.model}" not found. Available models: '
-                        'gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-pro. '
+                        f'{", ".join(sorted(GEMINI_MODELS))}. '
                         "Set GEMINI_MODEL in Secrets to one of these."
                     ) from e
                 raise
-            except Exception:
+
+    def _call_groq(self, prompt):
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self.groq_client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "Rate limit" in err_str:
+                    if attempt < self.max_retries:
+                        delay = (2 ** attempt) * 5
+                        time.sleep(delay)
+                        continue
                 raise
+
+    def _generate(self, prompt):
+        if self.provider == "groq":
+            return self._call_groq(prompt)
+        response = self._call_gemini(prompt)
+        return response.text
 
     def _extract_json(self, text):
         json_match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
@@ -122,13 +174,13 @@ class GeminiClient:
             domain=domain,
             memory_exclusions=memory_exclusions,
         )
-        response = self._call_with_retry(prompt)
+        text = self._generate(prompt)
         try:
-            questions = self._extract_json(response.text)
+            questions = self._extract_json(text)
         except Exception:
             lines = [
                 q.strip().strip('"').strip("'")
-                for q in response.text.strip().split("\n")
+                for q in text.strip().split("\n")
                 if q.strip()
             ]
             questions = [q for q in lines if q and not q.startswith("[") and not q.endswith("]")]
@@ -139,9 +191,9 @@ class GeminiClient:
 
     def evaluate_answer(self, question, answer):
         prompt = EVALUATION_PROMPT.format(question=question, answer=answer)
-        response = self._call_with_retry(prompt)
+        text = self._generate(prompt)
         try:
-            result = self._extract_json(response.text)
+            result = self._extract_json(text)
         except Exception:
             return {
                 "technical_accuracy": 5,
@@ -151,7 +203,7 @@ class GeminiClient:
                 "overall": 5.0,
                 "strengths": "Evaluation parsing failed.",
                 "improvements": "Evaluation parsing failed.",
-                "feedback": response.text[:500],
+                "feedback": text[:500],
             }
         required_keys = [
             "technical_accuracy",
@@ -176,9 +228,9 @@ class GeminiClient:
             count=count,
             evaluations_json=evaluations_json,
         )
-        response = self._call_with_retry(prompt)
+        text = self._generate(prompt)
         try:
-            result = self._extract_json(response.text)
+            result = self._extract_json(text)
         except Exception:
             avg = sum(e.get("overall", 5) for e in evaluations) / max(len(evaluations), 1)
             return {
