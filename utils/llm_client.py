@@ -46,7 +46,8 @@ Return your evaluation as a valid JSON object with exactly this structure (no ma
     "overall": <float (average of all four)>,
     "strengths": "<string - 1-2 specific strengths>",
     "improvements": "<string - 1-2 specific areas to improve>",
-    "feedback": "<string - 2-3 sentences of detailed feedback>"
+    "feedback": "<string - 2-3 sentences of detailed feedback>",
+    "model_answer": "<string - a concise, correct model answer to this question>"
 }}"""
 
 SUMMARY_PROMPT = """You are a senior technical interviewer generating a final performance report.
@@ -204,6 +205,7 @@ class LLMClient:
                 "strengths": "Evaluation parsing failed.",
                 "improvements": "Evaluation parsing failed.",
                 "feedback": text[:500],
+                "model_answer": "Could not generate model answer.",
             }
         required_keys = [
             "technical_accuracy",
@@ -214,10 +216,12 @@ class LLMClient:
             "strengths",
             "improvements",
             "feedback",
+            "model_answer",
         ]
+        str_keys = {"strengths", "improvements", "feedback", "model_answer"}
         for key in required_keys:
             if key not in result:
-                result[key] = "" if key in ("strengths", "improvements", "feedback") else 5
+                result[key] = "" if key in str_keys else 5
         return result
 
     def generate_summary(self, domain, difficulty, count, evaluations):

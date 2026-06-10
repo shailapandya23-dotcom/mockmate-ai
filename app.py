@@ -10,8 +10,6 @@ from utils.storage import (
     load_question_memory,
     save_question_memory,
     get_memory_exclusions,
-    load_history,
-    save_interview,
 )
 from utils.pdf_generator import generate_pdf
 
@@ -551,6 +549,13 @@ def show_interview_page():
             unsafe_allow_html=True,
         )
 
+        st.markdown(
+            f'<div class="feedback-section" style="border-left-color: #27AE60;">'
+            f'<strong>\U00002705 Model Answer</strong><br>'
+            f'{eval_data.get("model_answer", "N/A")}</div>',
+            unsafe_allow_html=True,
+        )
+
         st.markdown("---")
 
         if q_idx < total - 1:
@@ -711,7 +716,7 @@ def show_dashboard_page():
                         "final_score": overall,
                         "pdf_filename": filename,
                     }
-                    save_interview(history_record)
+                    st.session_state.session_history.append(history_record)
                 except Exception as e:
                     st.error(f"Error generating PDF: {str(e)}")
         elif not name:
@@ -732,10 +737,10 @@ def show_history_page():
     st.markdown("# \U0001f4ca Interview History")
     st.markdown("---")
 
-    history = load_history()
+    history = st.session_state.session_history
 
     if not history:
-        st.info("No interviews completed yet. Start your first interview!")
+        st.info("No interviews completed in this session. Start your first interview!")
         _, center, _ = st.columns([1, 2, 1])
         with center:
             if st.button("\U000025b6 Start Interview", use_container_width=True, type="primary"):
@@ -743,7 +748,7 @@ def show_history_page():
                 st.rerun()
         return
 
-    st.markdown(f"**{len(history)}** interview(s) completed.")
+    st.markdown(f"**{len(history)}** interview(s) in this session.")
 
     for i, record in enumerate(reversed(history)):
         score = record.get("final_score", 0)

@@ -15,6 +15,7 @@ def init_session_state():
         "candidate_name": "",
         "interview_started": False,
         "all_evaluations_data": [],
+        "session_history": [],
     }
     for key, val in defaults.items():
         if key not in st.session_state:
