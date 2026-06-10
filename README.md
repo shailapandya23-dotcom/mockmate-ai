@@ -93,10 +93,9 @@ mockmate-ai/
 │   ├── question_memory.json     # Tracks used questions (auto-created)
 │   └── history/
 │       └── history.json         # Interview history (auto-created)
-└── utils/
-    ├── gemini_client.py         # Gemini API wrapper
-    ├── pdf_generator.py         # PDF report generation
-    ├── prompts.py               # LLM prompt templates
-    ├── session.py               # Session state management
-    └── storage.py               # JSON file I/O
+    └── utils/
+        ├── gemini_client.py         # Gemini API wrapper + prompt templates
+        ├── pdf_generator.py         # PDF report generation
+        ├── session.py               # Session state management
+        └── storage.py               # JSON file I/O
 ```
