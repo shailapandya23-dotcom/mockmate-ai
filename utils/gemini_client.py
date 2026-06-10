@@ -3,7 +3,7 @@ import re
 
 from google import genai
 
-from utils.prompts import QUESTION_GEN_PROMPT, EVALUATION_PROMPT, SUMMARY_PROMPT
+from .prompts import QUESTION_GEN_PROMPT, EVALUATION_PROMPT, SUMMARY_PROMPT
 
 
 class GeminiClient:
