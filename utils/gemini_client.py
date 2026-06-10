@@ -95,6 +95,12 @@ class GeminiClient:
                         delay = (2 ** attempt) * 5
                         time.sleep(delay)
                         continue
+                if "404" in str(e) or "NOT_FOUND" in str(e):
+                    raise RuntimeError(
+                        f'Model "{self.model}" not found. Available models: '
+                        'gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-pro. '
+                        "Set GEMINI_MODEL in Secrets to one of these."
+                    ) from e
                 raise
             except Exception:
                 raise
