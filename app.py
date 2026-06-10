@@ -24,6 +24,11 @@ def get_api_key():
         return key
     return None
 
+
+def configure_from_secrets():
+    if "GEMINI_MODEL" in st.secrets:
+        os.environ["GEMINI_MODEL"] = st.secrets["GEMINI_MODEL"]
+
 st.set_page_config(
     page_title="MockMate AI — Technical Interview Simulator",
     page_icon="\U0001f3af",
@@ -261,6 +266,7 @@ st.markdown(
 )
 
 init_session_state()
+configure_from_secrets()
 
 # -------------------------------------------------------------------
 # Sidebar

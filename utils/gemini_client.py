@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 
@@ -79,7 +80,7 @@ Derive the overall_score and skill_breakdown as averages/composites from the eva
 class GeminiClient:
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.0-flash"
+        self.model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
         self.max_retries = 3
 
     def _call_with_retry(self, prompt):
